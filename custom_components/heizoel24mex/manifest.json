@@ -6,7 +6,7 @@
   "dependencies": ["http"],
   "documentation": "https://github.com/MartinStoffel/heizoel24mex",
   "iot_class": "cloud_polling",
-  "requirements": [],
   "issue_tracker": "https://github.com/MartinStoffel/heizoel24mex/issues",
+  "requirements": [],
   "version": "0.2.0"
 }
