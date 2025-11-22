@@ -33,7 +33,7 @@ DEVICE_PROPERTIES = {
         "native_unit_of_measurement": UnitOfVolume.LITERS,
         "device_class": SensorDeviceClass.GAS,
         "state_class": SensorStateClass.TOTAL_INCREASING,
-        "attr_icon": "mdi:storage-tank",
+        "attr_icon": "mdi:storage-tank-outline",
     },
     "CurrentVolume": {
         "name": "Oil in stock",
