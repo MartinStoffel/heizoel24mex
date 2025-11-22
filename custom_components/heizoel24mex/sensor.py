@@ -28,6 +28,13 @@ from .const import DATA_URL, DOMAIN, LOGIN_URL
 _LOGGER = logging.getLogger(__name__)
 
 DEVICE_PROPERTIES = {
+    "MaxVolume": {
+        "name": "Oil free capacity",
+        "native_unit_of_measurement": UnitOfVolume.LITERS,
+        "device_class": SensorDeviceClass.GAS,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "attr_icon": "mdi:storage-tank",
+    },
     "CurrentVolume": {
         "name": "Oil in stock",
         "native_unit_of_measurement": UnitOfVolume.LITERS,
@@ -49,6 +56,14 @@ DEVICE_PROPERTIES = {
         "state_class": SensorStateClass.MEASUREMENT,
         "attr_icon": "mdi:oil",
         "suggested_display_precision": 2,
+    },
+    "LastOrderPrice": {
+        "name": "Last order price",
+        "native_unit_of_measurement": "cur/L",
+        "device_class": None,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "attr_icon": "mdi:cash",
+        "suggested_display_precision": 4,
     },
     "RemainingDays": {
         "name": "Oil remaining",
@@ -182,3 +197,8 @@ class HeizOel24MexSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_value = self.coordinator.get_reading(self._property)
         if self._property == "SensorId":
             self._attr_extra_state_attributes = self.coordinator.get_data()
+        if self._property == "LastOrderPrice":
+            self._attr_native_value = self._attr_native_value/100.0
+        if self._property == "MaxVolume":
+            self._attr_native_value = self._attr_native_value - self.coordinator.get_reading("CurrentVolume")
+
