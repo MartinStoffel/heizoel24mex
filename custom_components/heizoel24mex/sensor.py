@@ -194,11 +194,19 @@ class HeizOel24MexSensor(CoordinatorEntity, SensorEntity):
 
     def update(self) -> None:
         """Update the data values."""
-        self._attr_native_value = self.coordinator.get_reading(self._property)
-        if self._property == "SensorId":
-            self._attr_extra_state_attributes = self.coordinator.get_data()
-        if self._property == "LastOrderPrice":
-            self._attr_native_value = self._attr_native_value/100.0
-        if self._property == "MaxVolume":
-            self._attr_native_value = self._attr_native_value - self.coordinator.get_reading("CurrentVolume")
-
+        try:
+            self._attr_native_value = self.coordinator.get_reading(self._property)
+            if self._property == "SensorId":
+                self._attr_extra_state_attributes = self.coordinator.get_data()
+            if self._property == "LastOrderPrice":
+                try:
+                    self._attr_native_value = self._attr_native_value/100.0
+                except TypeError:
+                    _LOGGER.info("Last order price not avalilable")
+            if self._property == "MaxVolume":
+                try:
+                    self._attr_native_value = self._attr_native_value - self.coordinator.get_reading("CurrentVolume")
+                except TypeError:
+                    _LOGGER.info("Max or current volume not avalilable")
+        except Exception as e:
+            _LOGGER.warning(f"uexpected problem: {e.__class__} occurred details: {e}")
