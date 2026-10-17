@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTime, UnitOfVolume
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -72,6 +72,7 @@ DEVICE_PROPERTIES = {
         "state_class": SensorStateClass.MEASUREMENT,
         # The battery device class shows an icon matching the level
         "attr_icon": None,
+        "entity_category": EntityCategory.DIAGNOSTIC,
     },
     "SensorId": {
         "name": "MEX Sensor ID",
@@ -112,6 +113,7 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
         self._attr_suggested_display_precision = properties.get(
             "suggested_display_precision"
         )
+        self._attr_entity_category = properties.get("entity_category")
         self._update_from_coordinator()
 
     @callback
