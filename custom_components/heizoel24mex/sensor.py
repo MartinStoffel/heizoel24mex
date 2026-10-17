@@ -61,16 +61,17 @@ DEVICE_PROPERTIES = {
     "RemainingDays": {
         "name": "Oil remaining",
         "native_unit_of_measurement": UnitOfTime.DAYS,
-        "device_class": None,
+        "device_class": SensorDeviceClass.DURATION,
         "state_class": None,
         "attr_icon": "mdi:timer",
     },
     "BatteryPercentage": {
         "name": "MEX Battery level",
         "native_unit_of_measurement": PERCENTAGE,
-        "device_class": None,
+        "device_class": SensorDeviceClass.BATTERY,
         "state_class": SensorStateClass.MEASUREMENT,
-        "attr_icon": "mdi:battery",
+        # The battery device class shows an icon matching the level
+        "attr_icon": None,
     },
     "SensorId": {
         "name": "MEX Sensor ID",
