@@ -13,7 +13,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN, LOGIN_URL
+from .const import DOMAIN, LOGIN_URL, REQUEST_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,23 +30,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-
-    # if not await hub.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD]):
-    #    raise InvalidAuth
-    data = {"Login": {"UserName": data[CONF_USERNAME], "Password": data[CONF_PASSWORD]}}
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
+    auth = {"Login": {"UserName": data[CONF_USERNAME], "Password": data[CONF_PASSWORD]}}
     try:
         async with (
-            aiohttp.ClientSession() as session,
-            session.post(LOGIN_URL, json=data) as result,
+            aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+            ) as session,
+            session.post(LOGIN_URL, json=auth) as result,
         ):
             status = await result.json()
     except Exception as e:
-        msg = f"Exception within mex24heizoel::validate_input {e.__class__} {e}"
-        _LOGGER.warning(msg)
+        _LOGGER.warning("Login check failed: %s %s", e.__class__, e)
         raise CannotConnect from e
 
     if not status["Success"]:
@@ -56,8 +50,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     return {"title": "Heizöl24 Mex Sensor"}
 
 
-class ConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Mex 24 Heizöl Sensor."""
+class Heizoel24MexConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for the Heizoel24 MEX sensor."""
 
     VERSION = 1
 

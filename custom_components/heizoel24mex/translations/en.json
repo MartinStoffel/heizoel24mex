@@ -10,10 +10,10 @@
         },
         "step": {
             "user": {
-		"description": "Enter the data used to login to the HeizOel24 web page",
+                "description": "Enter the data used to login to the HeizOel24 web page",
                 "data": {
-		    "username": "e-mail",
-		    "password": "password"
+                    "username": "e-mail",
+                    "password": "password"
                 }
             }
         }

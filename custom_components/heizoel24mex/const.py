@@ -1,7 +1,9 @@
-DOMAIN = "heizoel24mex"
+"""Constants for the Heizoel24 MEX integration."""
 
-CONF_USERNAME = "username"
-CONF_PASSWORD = "password"
+DOMAIN = "heizoel24mex"
 
 LOGIN_URL = "https://www.heizoel24.de/api/account/anmelden"
 DATA_URL = "https://www.heizoel24.de/api/customer/mex/dashboard/get"
+
+# Total timeout in seconds for a request to the web API
+REQUEST_TIMEOUT = 30
