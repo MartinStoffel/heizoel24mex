@@ -76,7 +76,7 @@ DEVICE_PROPERTIES = {
         "name": "MEX Sensor ID",
         "native_unit_of_measurement": None,
         "device_class": None,
-        "state_class": SensorStateClass.MEASUREMENT,
+        "state_class": None,
         "attr_icon": "mdi:water-circle",
     },
 }
@@ -121,24 +121,20 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
 
     def _update_from_coordinator(self) -> None:
         """Update the sensor value from the coordinator data."""
+        data = self.coordinator.data
+        value = data.get(self._key)
         try:
-            self._attr_native_value = self.coordinator.get_reading(self._key)
-            if self._key == "SensorId":
-                self._attr_extra_state_attributes = self.coordinator.get_data()
-            if self._key == "LastOrderPrice":
-                try:
-                    self._attr_native_value = self._attr_native_value / 100.0
-                except TypeError:
-                    _LOGGER.info("Last order price not available")
             if self._key == "MaxVolume":
-                try:
-                    self._attr_native_value = (
-                        self._attr_native_value
-                        - self.coordinator.get_reading("CurrentVolume")
-                    )
-                except TypeError:
-                    _LOGGER.info("Max or current volume not available")
-        except Exception as e:
-            _LOGGER.warning(
-                "Unexpected problem: %s occurred details: %s", e.__class__, e
-            )
+                # Free capacity. It must become unknown if a volume is missing:
+                # reporting the whole tank would count as consumption in the
+                # energy dashboard.
+                value = value - data["CurrentVolume"]
+            elif self._key == "LastOrderPrice":
+                # The API reports the price per 100 L
+                value = value / 100.0
+        except (KeyError, TypeError):
+            _LOGGER.debug("%s is not available", self._key)
+            value = None
+        self._attr_native_value = value
+        if self._key == "SensorId":
+            self._attr_extra_state_attributes = data

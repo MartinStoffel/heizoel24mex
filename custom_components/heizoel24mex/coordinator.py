@@ -39,16 +39,17 @@ class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._auth = {"Login": {"UserName": username, "Password": password}}
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Log in and fetch the dashboard data from the web API."""
+        """Log in and fetch the readings of the MEX sensor from the web API."""
         try:
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
             ) as session:
                 async with session.post(LOGIN_URL, json=self._auth) as login_result:
                     if not (await login_result.json())["Success"]:
-                        raise ConfigEntryAuthFailed
+                        raise ConfigEntryAuthFailed("Login rejected by HeizOel24")
                 async with session.get(DATA_URL) as result:
-                    return await result.json()
+                    result.raise_for_status()
+                    data = await result.json()
         except ConfigEntryAuthFailed:
             raise
         except Exception as e:
@@ -56,10 +57,8 @@ class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             msg = f"Error communicating with API: {e}"
             raise UpdateFailed(msg) from e
 
-    def get_data(self) -> dict[str, Any]:
-        """Get the reading data, assuming we have just one sensor."""
-        return self.data.get("Items", [{"0": None}])[0]
-
-    def get_reading(self, key: str) -> Any:
-        """Get a single reading, assuming we have just one sensor."""
-        return self.get_data().get(key)
+        # Only one MEX sensor per account is supported
+        items = data.get("Items") if isinstance(data, dict) else None
+        if not items or not isinstance(items[0], dict):
+            raise UpdateFailed("No MEX sensor readings in the API response")
+        return items[0]
