@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import CONF_LEGACY_SENSOR_ID, DOMAIN, LEGACY_UNIQUE_ID_PREFIX
 from .coordinator import Heizoel24MexCoordinator
@@ -34,6 +34,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow deleting the device of a sensor that is gone from the account."""
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is None:
+        # Not loaded, so it's unknown which sensors still exist
+        return False
+    return not any(
+        domain == DOMAIN and sensor_id in coordinator.data
+        for domain, sensor_id in device_entry.identifiers
+    )
 
 
 @callback
