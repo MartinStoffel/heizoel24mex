@@ -1,7 +1,8 @@
 {
   "name": "HeizOel24 MEX",
   "render_readme": true,
-  "country": "CH"
+  "country": ["DE", "AT", "CH"],
+  "homeassistant": "2024.11.0"
 }
 
 

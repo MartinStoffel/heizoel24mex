@@ -1,7 +1,8 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Device is already configured"
+            "already_configured": "Device is already configured",
+            "reauth_successful": "Re-authentication was successful"
         },
         "error": {
             "cannot_connect": "Failed to connect",
@@ -10,10 +11,17 @@
         },
         "step": {
             "user": {
-		"description": "Enter the data used to login to the HeizOel24 web page",
+                "description": "Enter the data used to login to the HeizOel24 web page",
                 "data": {
-		    "username": "e-mail",
-		    "password": "password"
+                    "username": "e-mail",
+                    "password": "password"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Re-authenticate",
+                "description": "HeizOel24 rejected the login for {username}. Enter the current password.",
+                "data": {
+                    "password": "password"
                 }
             }
         }

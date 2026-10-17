@@ -2,28 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
-
-import aiohttp
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTime, UnitOfVolume
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DATA_URL, DOMAIN, LOGIN_URL
+from .const import DOMAIN
+from .coordinator import Heizoel24MexCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,145 +61,83 @@ DEVICE_PROPERTIES = {
     "RemainingDays": {
         "name": "Oil remaining",
         "native_unit_of_measurement": UnitOfTime.DAYS,
-        "device_class": None,
+        "device_class": SensorDeviceClass.DURATION,
         "state_class": None,
         "attr_icon": "mdi:timer",
     },
     "BatteryPercentage": {
         "name": "MEX Battery level",
         "native_unit_of_measurement": PERCENTAGE,
-        "device_class": None,
+        "device_class": SensorDeviceClass.BATTERY,
         "state_class": SensorStateClass.MEASUREMENT,
-        "attr_icon": "mdi:battery",
+        # The battery device class shows an icon matching the level
+        "attr_icon": None,
+        "entity_category": EntityCategory.DIAGNOSTIC,
     },
     "SensorId": {
         "name": "MEX Sensor ID",
         "native_unit_of_measurement": None,
         "device_class": None,
-        "state_class": SensorStateClass.MEASUREMENT,
+        "state_class": None,
         "attr_icon": "mdi:water-circle",
     },
 }
 
-# Time between updating data
-SCAN_INTERVAL = timedelta(hours=12)
-
 
 async def async_setup_entry(
-    hass: HomeAssistant, config: ConfigType, add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the sensors."""
-    coordinator = hass.data[DOMAIN][config.entry_id]
+    coordinator: Heizoel24MexCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = []
-    entities.extend(HeizOel24MexSensor(coordinator, key) for key in DEVICE_PROPERTIES)
-    add_entities(entities)
-
-
-class Heizoel24MexData:
-    """Class which gets the data."""
-
-    def __init__(self, username: str, password: str) -> None:
-        """Initialize Data constructor."""
-        self._auth = {"Login": {"UserName": username, "Password": password}}
-        self._data = None
-
-    async def fetch_data(self) -> None:
-        """Get the data from the web api."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                loginResult = await session.post(LOGIN_URL, json=self._auth)
-                if not (await loginResult.json())["Success"]:
-                    raise ConfigEntryAuthFailed
-                async with session.get(DATA_URL) as result:
-                    self._data = await result.json()
-        except ConfigEntryAuthFailed:
-            raise
-        except Exception as e:
-            msg = f"{e.__class__} occurred details: {e}"
-            _LOGGER.warning(msg)
-            msg = f"Error communicating with API: {e}"
-            raise UpdateFailed(msg) from e
-
-    def get_reading(self, property: str) -> any:
-        """Get the reading, assuming we have just one sensor."""
-        return self.get_data().get(property)
-
-    def get_data(self) -> dict:
-        """Get the reading data, assuming we have just one sensor."""
-        return self._data.get("Items", [{"0": None}])[0]
+    async_add_entities(
+        HeizOel24MexSensor(coordinator, key) for key in DEVICE_PROPERTIES
+    )
 
 
-# see https://developers.home-assistant.io/docs/integration_fetching_data/
-class Heizoel24MexCoordinator(DataUpdateCoordinator):
-    """Represents Coordinator for this sensor."""
-
-    def __init__(self, hass: HomeAssistant, heizoel_data) -> None:
-        """Initialize my coordinator."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            # Name of the data. For logging purposes.
-            name="Heizoel24MexCoordinator",
-            # Polling interval. Will only be polled if there are subscribers.
-            update_interval=SCAN_INTERVAL,
-        )
-        self.heizoel_data = heizoel_data
-
-    async def _async_update_data(self):
-        return await self.heizoel_data.fetch_data()
-
-    def get_reading(self, property: str) -> any:
-        """Get the actual reaging."""
-        return self.heizoel_data.get_reading(property)
-
-    def get_data(self) -> any:
-        """Get the whole reaging data."""
-        return self.heizoel_data.get_data()
-
-
-class HeizOel24MexSensor(CoordinatorEntity, SensorEntity):
+class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntity):
     """Implementation of the HeizOel24MexSensor."""
 
-    def __init__(self, coordinator, property) -> None:
+    def __init__(self, coordinator: Heizoel24MexCoordinator, key: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._property = property
-        self._attr_unique_id = DOMAIN + ".mex_" + property
+        self._key = key
+        self._attr_unique_id = DOMAIN + ".mex_" + key
 
-        self._attr_name = DEVICE_PROPERTIES[property]["name"]
-        self._attr_native_unit_of_measurement = DEVICE_PROPERTIES[property][
-            "native_unit_of_measurement"
-        ]
-        self._attr_device_class = DEVICE_PROPERTIES[property]["device_class"]
-        self._attr_state_class = DEVICE_PROPERTIES[property]["state_class"]
-        self._attr_icon = DEVICE_PROPERTIES[property]["attr_icon"]
-        self._attr_suggested_display_precision = DEVICE_PROPERTIES[property].get(
+        properties = DEVICE_PROPERTIES[key]
+        self._attr_name = properties["name"]
+        self._attr_native_unit_of_measurement = properties["native_unit_of_measurement"]
+        self._attr_device_class = properties["device_class"]
+        self._attr_state_class = properties["state_class"]
+        self._attr_icon = properties["attr_icon"]
+        self._attr_suggested_display_precision = properties.get(
             "suggested_display_precision"
         )
-        self.update()
+        self._attr_entity_category = properties.get("entity_category")
+        self._update_from_coordinator()
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self.update()
+        self._update_from_coordinator()
         self.async_write_ha_state()
 
-    def update(self) -> None:
-        """Update the data values."""
+    def _update_from_coordinator(self) -> None:
+        """Update the sensor value from the coordinator data."""
+        data = self.coordinator.data
+        value = data.get(self._key)
         try:
-            self._attr_native_value = self.coordinator.get_reading(self._property)
-            if self._property == "SensorId":
-                self._attr_extra_state_attributes = self.coordinator.get_data()
-            if self._property == "LastOrderPrice":
-                try:
-                    self._attr_native_value = self._attr_native_value/100.0
-                except TypeError:
-                    _LOGGER.info("Last order price not avalilable")
-            if self._property == "MaxVolume":
-                try:
-                    self._attr_native_value = self._attr_native_value - self.coordinator.get_reading("CurrentVolume")
-                except TypeError:
-                    _LOGGER.info("Max or current volume not avalilable")
-        except Exception as e:
-            _LOGGER.warning(f"uexpected problem: {e.__class__} occurred details: {e}")
+            if self._key == "MaxVolume":
+                # Free capacity. It must become unknown if a volume is missing:
+                # reporting the whole tank would count as consumption in the
+                # energy dashboard.
+                value = value - data["CurrentVolume"]
+            elif self._key == "LastOrderPrice":
+                # The API reports the price per 100 L
+                value = value / 100.0
+        except (KeyError, TypeError):
+            _LOGGER.debug("%s is not available", self._key)
+            value = None
+        self._attr_native_value = value
+        if self._key == "SensorId":
+            self._attr_extra_state_attributes = data
