@@ -61,6 +61,8 @@ class Heizoel24MexConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         errors: dict[str, str] = {}
         if user_input is not None:
+            await self.async_set_unique_id(user_input[CONF_USERNAME].strip().lower())
+            self._abort_if_unique_id_configured()
             errors = await self._async_check_login(user_input)
             if not errors:
                 return self.async_create_entry(title=TITLE, data=user_input)

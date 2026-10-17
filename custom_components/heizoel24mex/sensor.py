@@ -12,10 +12,11 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CONF_LEGACY_SENSOR_ID, DOMAIN, LEGACY_UNIQUE_ID_PREFIX
 from .coordinator import Heizoel24MexCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ DEVICE_PROPERTIES = {
         "attr_icon": "mdi:timer",
     },
     "BatteryPercentage": {
-        "name": "MEX Battery level",
+        "name": "Battery level",
         "native_unit_of_measurement": PERCENTAGE,
         "device_class": SensorDeviceClass.BATTERY,
         "state_class": SensorStateClass.MEASUREMENT,
@@ -75,7 +76,7 @@ DEVICE_PROPERTIES = {
         "entity_category": EntityCategory.DIAGNOSTIC,
     },
     "SensorId": {
-        "name": "MEX Sensor ID",
+        "name": "Sensor ID",
         "native_unit_of_measurement": None,
         "device_class": None,
         "state_class": None,
@@ -87,22 +88,47 @@ DEVICE_PROPERTIES = {
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up the sensors."""
+    """Set up the sensors of all MEX sensors, including ones added later."""
     coordinator: Heizoel24MexCoordinator = hass.data[DOMAIN][entry.entry_id]
+    known_sensor_ids: set[str] = set()
 
-    async_add_entities(
-        HeizOel24MexSensor(coordinator, key) for key in DEVICE_PROPERTIES
-    )
+    @callback
+    def _async_add_new_sensors() -> None:
+        new_sensor_ids = [i for i in coordinator.data if i not in known_sensor_ids]
+        known_sensor_ids.update(new_sensor_ids)
+        async_add_entities(
+            HeizOel24MexSensor(coordinator, sensor_id, key)
+            for sensor_id in new_sensor_ids
+            for key in DEVICE_PROPERTIES
+        )
+
+    _async_add_new_sensors()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_sensors))
 
 
 class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntity):
-    """Implementation of the HeizOel24MexSensor."""
+    """A reading of one MEX sensor."""
 
-    def __init__(self, coordinator: Heizoel24MexCoordinator, key: str) -> None:
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, coordinator: Heizoel24MexCoordinator, sensor_id: str, key: str
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
+        self._sensor_id = sensor_id
         self._key = key
-        self._attr_unique_id = DOMAIN + ".mex_" + key
+        if sensor_id == coordinator.config_entry.data.get(CONF_LEGACY_SENSOR_ID):
+            # Created before multi-sensor support; keep the unique ID and history
+            self._attr_unique_id = LEGACY_UNIQUE_ID_PREFIX + key
+        else:
+            self._attr_unique_id = f"{sensor_id}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, sensor_id)},
+            name=f"MEX {sensor_id}",
+            manufacturer="HeizOel24",
+            model="MEX",
+        )
 
         properties = DEVICE_PROPERTIES[key]
         self._attr_name = properties["name"]
@@ -116,6 +142,11 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
         self._attr_entity_category = properties.get("entity_category")
         self._update_from_coordinator()
 
+    @property
+    def available(self) -> bool:
+        """Return if the sensor is still reported by the web API."""
+        return super().available and self._sensor_id in self.coordinator.data
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -123,8 +154,11 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
         self.async_write_ha_state()
 
     def _update_from_coordinator(self) -> None:
-        """Update the sensor value from the coordinator data."""
-        data = self.coordinator.data
+        """Update the sensor value from the readings of its MEX sensor."""
+        data = self.coordinator.data.get(self._sensor_id)
+        if data is None:
+            # The sensor is gone from the account; it is shown as unavailable
+            return
         value = data.get(self._key)
         try:
             if self._key == "MaxVolume":
@@ -136,8 +170,9 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
                 # The API reports the price per 100 L
                 value = value / 100.0
         except (KeyError, TypeError):
-            _LOGGER.debug("%s is not available", self._key)
+            _LOGGER.debug("%s of %s is not available", self._key, self._sensor_id)
             value = None
         self._attr_native_value = value
         if self._key == "SensorId":
+            # The readings of this MEX sensor only
             self._attr_extra_state_attributes = data
