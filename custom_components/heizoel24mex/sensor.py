@@ -169,6 +169,9 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
             elif self._key == "LastOrderPrice":
                 # The API reports the price per 100 L
                 value = value / 100.0
+            elif self._key == "BatteryPercentage" and not 0 <= value <= 100:
+                # Not a battery level, e.g. a placeholder for "no value"
+                value = None
         except (KeyError, TypeError):
             _LOGGER.debug("%s of %s is not available", self._key, self._sensor_id)
             value = None
