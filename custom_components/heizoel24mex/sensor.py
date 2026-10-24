@@ -29,6 +29,15 @@ DEVICE_PROPERTIES = {
         "state_class": SensorStateClass.TOTAL_INCREASING,
         "attr_icon": "mdi:storage-tank-outline",
     },
+    "TankCapacity": {
+        "name": "Oil tank capacity",
+        # MaxVolume as is; the key MaxVolume is taken by "Oil free capacity"
+        "source": "MaxVolume",
+        "native_unit_of_measurement": UnitOfVolume.LITERS,
+        "device_class": SensorDeviceClass.VOLUME_STORAGE,
+        "state_class": None,
+        "attr_icon": "mdi:barrel",
+    },
     "CurrentVolume": {
         "name": "Oil in stock",
         "native_unit_of_measurement": UnitOfVolume.LITERS,
@@ -131,6 +140,8 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
         )
 
         properties = DEVICE_PROPERTIES[key]
+        # The API field to read, if it differs from the key
+        self._source = properties.get("source", key)
         self._attr_name = properties["name"]
         self._attr_native_unit_of_measurement = properties["native_unit_of_measurement"]
         self._attr_device_class = properties["device_class"]
@@ -159,7 +170,7 @@ class HeizOel24MexSensor(CoordinatorEntity[Heizoel24MexCoordinator], SensorEntit
         if data is None:
             # The sensor is gone from the account; it is shown as unavailable
             return
-        value = data.get(self._key)
+        value = data.get(self._source)
         try:
             if self._key == "MaxVolume":
                 # Free capacity. It must become unknown if a volume is missing:
