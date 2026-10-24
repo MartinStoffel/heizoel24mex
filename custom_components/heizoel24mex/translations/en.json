@@ -1,7 +1,7 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Device is already configured",
+            "already_configured": "This HeizOel24 account is already configured",
             "reauth_successful": "Re-authentication was successful"
         },
         "error": {

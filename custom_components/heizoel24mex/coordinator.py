@@ -21,8 +21,8 @@ SCAN_INTERVAL = timedelta(hours=12)
 
 
 # see https://developers.home-assistant.io/docs/integration_fetching_data/
-class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Fetches the MEX dashboard data from the HeizOel24 web API."""
+class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
+    """Fetches the readings of all MEX sensors of an account from the web API."""
 
     def __init__(
         self, hass: HomeAssistant, entry: ConfigEntry, username: str, password: str
@@ -37,8 +37,8 @@ class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._auth = {"Login": {"UserName": username, "Password": password}}
 
-    async def _async_update_data(self) -> dict[str, Any]:
-        """Log in and fetch the readings of the MEX sensor from the web API."""
+    async def _async_update_data(self) -> dict[str, dict[str, Any]]:
+        """Log in and fetch the readings of the MEX sensors from the web API."""
         try:
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
@@ -56,8 +56,13 @@ class Heizoel24MexCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             msg = f"Error communicating with API: {e}"
             raise UpdateFailed(msg) from e
 
-        # Only one MEX sensor per account is supported
+        # Readings by sensor ID, in the order of the API response
         items = data.get("Items") if isinstance(data, dict) else None
-        if not items or not isinstance(items[0], dict):
+        readings = {
+            str(item["SensorId"]): item
+            for item in items or []
+            if isinstance(item, dict) and item.get("SensorId") is not None
+        }
+        if not readings:
             raise UpdateFailed("No MEX sensor readings in the API response")
-        return items[0]
+        return readings
